@@ -12,8 +12,9 @@ On more complicated patterns like the one given below, it does not perform reall
 ![Pattern with mask](images/2/input_image.png) ![Pattern inpainted](images/2/sample_4900.png)
 
 Image inpainting requires larger networks. Results on a pair of images have been given below.
+Ground truth and inpainted result.
 
-![Image with mask](images/3/input_image.jpg) ![Image inpainted](images/3/sample_19900.png)
+![Ground truth](images/3/input_image.jpg) ![Image inpainted](images/3/sample_19900.png)
 
 Deep image prior understands the overall "texture" of an image and creates a function mapping
 from the noise space to the RGB space. To check this, an experiment was done where input noise
