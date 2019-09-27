@@ -24,4 +24,17 @@ The results are shown below.
 ![sample 1](images/noise_samples/sample_96.png) ![sample 2](images/noise_samples/sample_97.png)
 ![sample 3](images/noise_samples/sample_98.png) ![sample 4](images/noise_samples/sample_99.png)
 
-Results on image denoising will be added soon.
+Removing overlay text is a form of inpainting. The result are given below.
+
+![input](images/4/input_image.png) ![inpainted](images/4/sample_9900.png)
+
+Results on Denoising: Gaussian random noise (stddev = 25) was added using np.random.normal().
+The network was trained for 1700 optimizations (the original network was trained for 1800 steps).
+The results are given below: 1. Input 2. Denoised (after 1700 iterations) 3. Averaged (last 5)
+
+![input_image](images/8/input_image.png) ![sample 1700](images/8/sample_1700.png) ![average](images/8/average.png)
+
+Deep image prior was also tried on depixelating, which is a form of SR. The results are given 2x depixelation and 4x depixelation.
+
+![input](images/6/input_image.png) ![depixelated](images/6/sample_9900.png)
+![input](images/7/input_image.png) ![depixelated](images/7/sample_9900.png)
