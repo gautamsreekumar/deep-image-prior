@@ -37,5 +37,5 @@ The results are given below: 1. Input 2. Denoised (after 1700 iterations) 3. Ave
 
 Deep image prior was also tried on depixelating, which is a form of SR. The results are given 2x depixelation and 4x depixelation.
 
-![input](images/6/input_image.png) ![depixelated](images/6/sample_9900.png)
+![input](images/6/input_image.png) ![depixelated](images/6/sample_9900.png)<br/>
 ![input](images/7/input_image.png) ![depixelated](images/7/sample_9900.png)
