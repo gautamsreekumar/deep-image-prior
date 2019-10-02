@@ -5,6 +5,7 @@ import random
 import utils
 import os
 import imageio as imio
+from pixelate import pixelate
 
 # lambda for convolution function
 conv = lambda inp, filt, str, pad, id : tf.nn.conv2d(input   = inp,
@@ -22,23 +23,61 @@ deconv = lambda inp, filt, st, pad, name, op_shape : tf.nn.conv2d_transpose(valu
 													                        name = name)
 
 class dip:
-	def __init__(self, sess, fname, k1=5, k2=3, k3=3, l1=50,
-		l2=50, l3=50, batch_size=1, epochs=500, save_freq=100,
-		sample_freq=100, inpaint=False, denoise=True):
-		self.inpaint = inpaint
-		self.denoise = denoise
+	def __init__(self, sess, fname, k1=5, k2=3, k3=3, l1=100,
+		l2=100, l3=100, batch_size=1, epochs=500, save_freq=100,
+		sample_freq=100, task=0, aout=64, nsd=20.):
+		self.inpaint = False
+		self.denoise = False
+		self.textremove = False
+		self.depixelate = False
+
+		self.noise_stddev = nsd
+
+		if task == 0:
+			self.inpaint = True
+		elif task == 1:
+			self.denoise = True
+		elif task == 2:
+			self.textremove = True
+		elif task == 3:
+			self.depixelate = True
+			if aout == 0:
+				print "Invalid value for output image dimensions"
+				return
+			else:
+				self.aout = aout
+		else:
+			print "Task argument is wrong."
+			return
 		self.img = imio.imread(fname).astype(np.float32)
 		self.original = self.img/255.
+		self.a1, self.a2, _ = self.img.shape
 		self.mask = np.ones_like(self.img)
+		
+		textimage = 'text.jpg'
+		textmask = imio.imread(textimage).astype(np.float32)
+		
 		if self.inpaint:
 			self.mask[120:190, 140:200] = 0.
+		
+		if self.textremove:
+			self.mask = (textmask > np.mean(textmask)).astype(np.float32)
 		self.img = self.img*self.mask
+		
 		if self.denoise:
-			self.img += np.random.normal(0, 25., self.img.shape)
+			if self.noise_stddev <= 0.:
+				print "Invalid value for noise standard deviation"
+				return
+			self.img += np.random.normal(0, self.noise_stddev, self.img.shape)
 			self.img = np.clip(self.img, 0, 255)
+
+		if self.depixelate:
+			self.k = self.a1//self.aout
+			self.img, self.img_label_ = pixelate(fname, self.a1, self.aout)
+			self.img_label_ = self.img_label_.astype(np.float32)/255.
+		
 		imio.imwrite('input_image.png', self.img.astype(np.uint8))
-		self.img = self.img/255.
-		self.a1, self.a2, _ = self.img.shape
+		self.img = self.img.astype(np.float32)/255.
 		self.img = self.img.reshape(1, self.a1, self.a2, 3)
 		self.mask = self.mask.reshape(1, self.a1, self.a2, 3)
 
@@ -176,10 +215,23 @@ class dip:
 		self.deconv4    = tf.sigmoid(deconv(self.deconv3, self.dw4, 1, 'VALID', 'deconv4', tf.shape(self.img_label)))
 		print "deconv4", self.deconv4
 
-		self.L1 = 0.
-		self.L2 = 1.
+		if self.depixelate:
+			self.dw5       = tf.Variable(tf.truncated_normal(
+									shape=[self.K2, self.K2, 3, 3],
+									stddev=0.01),
+								name='dw5')
 
-		self.error = tf.reduce_mean(self.mask*(self.deconv4 - self.img_label)**2)
+			self.deconv5    = tf.sigmoid(conv(self.deconv4, self.dw5, 1, 'SAME', 'conv5'))
+			print "deconv5", self.deconv5
+
+		if self.depixelate:
+			self.kern = tf.constant(1./(self.k*self.k), shape=[self.k, self.k, 3, 1])
+			self.deconv4_ = tf.nn.depthwise_conv2d(self.deconv5, self.kern, [1, self.k, self.k, 1],
+													'VALID', name='deconv4_')
+			# self.deconv4_ = conv(self.deconv4, self.kern, self.k, 'VALID', 'deconv4_')
+			self.error = tf.reduce_mean((self.deconv4_ - self.img_label_)**2)
+		else:
+			self.error = tf.reduce_mean(self.mask*(self.deconv4 - self.img_label)**2)
 
 		self.optim = tf.train.AdamOptimizer().minimize(self.error)
 
@@ -218,9 +270,13 @@ class dip:
 			if (e % self.sample_freq) == 0:
 				if not os.path.exists('./samples'):
 					os.makedirs('./samples')
-				output = self.sess.run(self.deconv4,
-										feed_dict={self.img_train: self.inp_noise, self.img_label: self.img})
-				if self.denoise:
+				if self.depixelate:
+					output = self.sess.run(self.deconv5,
+											feed_dict={self.img_train: self.inp_noise, self.img_label: self.img})
+				else:
+					output = self.sess.run(self.deconv4,
+											feed_dict={self.img_train: self.inp_noise, self.img_label: self.img})
+				if self.denoise or self.depixelate:
 					mse = np.mean((output[0]-self.original)**2)
 					psnr = 20.*np.log10(1./np.sqrt(mse))
 					print "----------------------------------------"
